@@ -30,6 +30,12 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
+
+  // APIルートは各ルートが自前で認証するので除外
+  if (pathname.startsWith('/api/')) {
+    return supabaseResponse
+  }
+
   const isAuthPage =
     pathname.startsWith('/login') || pathname.startsWith('/register')
 
