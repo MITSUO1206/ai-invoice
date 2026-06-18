@@ -3,6 +3,15 @@ import { createClient } from '@/lib/supabase/server'
 
 type Params = { params: Promise<{ id: string }> }
 
+async function getCallerCompanyId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data } = await supabase
+    .from('profiles')
+    .select('company_id')
+    .eq('id', userId)
+    .single()
+  return data?.company_id ?? null
+}
+
 export async function GET(_request: NextRequest, { params }: Params) {
   const { id } = await params
   const supabase = await createClient()
@@ -12,13 +21,17 @@ export async function GET(_request: NextRequest, { params }: Params) {
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const companyId = await getCallerCompanyId(supabase, user.id)
+  if (!companyId) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+
   const { data, error } = await supabase
     .from('invoices')
     .select('*')
     .eq('id', id)
+    .eq('company_id', companyId)
     .single()
 
-  if (error) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   return NextResponse.json(data)
 }
@@ -31,6 +44,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const companyId = await getCallerCompanyId(supabase, user.id)
+  if (!companyId) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
   const body = await request.json()
 
@@ -47,6 +63,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   const taxAmount = Math.floor(subtotal * taxRate)
   const total = subtotal + taxAmount
 
+  // company_id を条件に加えて他社請求書の変更を防ぐ
   const { data, error } = await supabase
     .from('invoices')
     .update({
@@ -64,10 +81,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
       total,
     })
     .eq('id', id)
+    .eq('company_id', companyId)
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   return NextResponse.json(data)
 }
@@ -81,9 +99,18 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { error } = await supabase.from('invoices').delete().eq('id', id)
+  const companyId = await getCallerCompanyId(supabase, user.id)
+  if (!companyId) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+
+  // company_id を条件に加えて他社請求書の削除を防ぐ
+  const { error, count } = await supabase
+    .from('invoices')
+    .delete({ count: 'exact' })
+    .eq('id', id)
+    .eq('company_id', companyId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (count === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   return NextResponse.json({ success: true })
 }

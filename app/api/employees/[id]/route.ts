@@ -14,7 +14,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
   const { data: myProfile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('company_id, role')
     .eq('id', user.id)
     .single()
 
@@ -24,18 +24,26 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
   const body = await request.json()
 
+  const VALID_ROLES = ['admin', 'manager', 'employee']
   const updateData: Record<string, unknown> = {}
-  if (body.role !== undefined) updateData.role = body.role
-  if (body.is_active !== undefined) updateData.is_active = body.is_active
+  if (body.role !== undefined) {
+    if (!VALID_ROLES.includes(body.role)) {
+      return NextResponse.json({ error: '無効なロールです' }, { status: 400 })
+    }
+    updateData.role = body.role
+  }
+  if (body.is_active !== undefined) updateData.is_active = Boolean(body.is_active)
 
+  // company_id を条件に加えて他社プロフィールの変更を防ぐ
   const { data, error } = await supabase
     .from('profiles')
     .update(updateData)
     .eq('id', id)
+    .eq('company_id', myProfile.company_id)
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   return NextResponse.json(data)
 }
