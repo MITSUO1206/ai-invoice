@@ -20,26 +20,42 @@ type Invitation = {
   id: string
   role: Role
   token: string
+  company_id: string
   expires_at: string
   created_at: string
 }
+
+type Company = { id: string; name: string }
 
 type Props = {
   profiles: Profile[]
   currentUserId: string
   invitations: Invitation[]
   baseUrl: string
+  companies: Company[]
+  myCompanyId: string
 }
 
-export default function EmployeesClient({ profiles: initial, currentUserId, invitations: initialInvitations, baseUrl }: Props) {
+export default function EmployeesClient({
+  profiles: initial,
+  currentUserId,
+  invitations: initialInvitations,
+  baseUrl,
+  companies,
+  myCompanyId,
+}: Props) {
   const router = useRouter()
   const [profiles, setProfiles] = useState(initial)
   const [invitations, setInvitations] = useState(initialInvitations)
   const [updating, setUpdating] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [newInviteRole, setNewInviteRole] = useState<Role>('employee')
+  const [newInviteCompany, setNewInviteCompany] = useState(myCompanyId)
   const [creating, setCreating] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
+
+  const companyName = (id: string) =>
+    companies.find((c) => c.id === id)?.name ?? id.slice(0, 8) + '...'
 
   async function updateRole(profileId: string, role: Role) {
     setUpdating(profileId)
@@ -80,19 +96,24 @@ export default function EmployeesClient({ profiles: initial, currentUserId, invi
   async function createInvite() {
     setCreating(true)
     setError('')
-    const res = await fetch('/api/invitations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role: newInviteRole }),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      setError(data.error || '招待リンクの作成に失敗しました')
-    } else {
-      setInvitations((prev) => [data, ...prev])
-      router.refresh()
+    try {
+      const res = await fetch('/api/invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newInviteRole, company_id: newInviteCompany }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || '招待リンクの作成に失敗しました')
+      } else {
+        setInvitations((prev) => [data, ...prev])
+        router.refresh()
+      }
+    } catch {
+      setError('通信エラーが発生しました')
+    } finally {
+      setCreating(false)
     }
-    setCreating(false)
   }
 
   async function deleteInvite(id: string) {
@@ -125,7 +146,20 @@ export default function EmployeesClient({ profiles: initial, currentUserId, invi
       {/* 招待リンク作成 */}
       <section className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="font-semibold text-gray-900 mb-4">招待リンクを発行</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {companies.length > 1 && (
+            <select
+              value={newInviteCompany}
+              onChange={(e) => setNewInviteCompany(e.target.value)}
+              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}{c.id === myCompanyId ? '（自社）' : ''}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             value={newInviteRole}
             onChange={(e) => setNewInviteRole(e.target.value as Role)}
@@ -156,6 +190,11 @@ export default function EmployeesClient({ profiles: initial, currentUserId, invi
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_CLASS[inv.role]}`}>
                     {ROLE_LABEL[inv.role]}
                   </span>
+                  {companies.length > 1 && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">
+                      {companyName(inv.company_id)}
+                    </span>
+                  )}
                   <span className="text-xs text-gray-500 flex-1 truncate">{url}</span>
                   <button
                     onClick={() => copyLink(inv.token)}

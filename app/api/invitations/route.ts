@@ -38,7 +38,6 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
   const requestedRole = body.role
 
-  // マネージャーはemployeeのみ招待可、adminロール招待はadminのみ
   const allowedRoles = profile.role === 'admin'
     ? ['admin', 'manager', 'employee']
     : ['employee']
@@ -46,13 +45,30 @@ export async function POST(request: NextRequest) {
   if (!allowedRoles.includes(requestedRole)) {
     return NextResponse.json({ error: 'そのロールの招待を発行する権限がありません' }, { status: 403 })
   }
-  const role = requestedRole
+
+  // adminは管理下の別会社へも招待可能
+  let targetCompanyId: string = profile.company_id
+  if (body.company_id && body.company_id !== profile.company_id) {
+    if (profile.role !== 'admin') {
+      return NextResponse.json({ error: '他社への招待はadminのみ可能です' }, { status: 403 })
+    }
+    // 管理下の会社かどうか確認
+    const { data: company } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('id', body.company_id)
+      .single()
+    if (!company) {
+      return NextResponse.json({ error: '指定された会社が見つかりません' }, { status: 404 })
+    }
+    targetCompanyId = body.company_id
+  }
 
   const { data, error } = await supabase
     .from('invitations')
     .insert({
-      company_id: profile.company_id,
-      role,
+      company_id: targetCompanyId,
+      role: requestedRole,
       created_by: user.id,
     })
     .select()
