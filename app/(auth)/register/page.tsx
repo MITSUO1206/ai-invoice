@@ -25,34 +25,43 @@ export default function RegisterPage() {
     setLoading(true)
     setError('')
 
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
 
-    const data = await res.json()
+      const data = await res.json()
 
-    if (!res.ok) {
-      setError(data.error || '登録に失敗しました')
+      if (!res.ok) {
+        setError(data.error || '登録に失敗しました')
+        setLoading(false)
+        return
+      }
+
+      const supabase = createClient()
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: form.email,
+        password: form.password,
+      })
+
+      if (loginError) {
+        if (loginError.message.includes('Email not confirmed')) {
+          setError('確認メールを送信しました。メールのリンクをクリックしてからログインしてください。')
+        } else {
+          setError('登録は完了しました。ログインページからサインインしてください。')
+        }
+        setLoading(false)
+        return
+      }
+
+      router.push('/dashboard')
+      router.refresh()
+    } catch {
+      setError('接続エラーが発生しました。しばらく待ってから再度お試しください。')
       setLoading(false)
-      return
     }
-
-    const supabase = createClient()
-    const { error: loginError } = await supabase.auth.signInWithPassword({
-      email: form.email,
-      password: form.password,
-    })
-
-    if (loginError) {
-      setError('登録は完了しました。ログインページからサインインしてください。')
-      setLoading(false)
-      return
-    }
-
-    router.push('/dashboard')
-    router.refresh()
   }
 
   return (
