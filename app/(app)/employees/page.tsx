@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import EmployeesClient from './EmployeesClient'
 import type { Profile } from '@/lib/types'
@@ -6,32 +7,35 @@ import type { Profile } from '@/lib/types'
 export default async function EmployeesPage() {
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const { data: myProfile } = await supabase
-    .from('profiles')
-    .select('company_id, role')
-    .eq('id', user.id)
-    .single()
+    .from('profiles').select('company_id, role').eq('id', user.id).single()
+  if (!myProfile || myProfile.role !== 'admin') redirect('/dashboard')
 
-  if (!myProfile || myProfile.role !== 'admin') {
-    redirect('/dashboard')
-  }
+  const headersList = await headers()
+  const host = headersList.get('host') ?? ''
+  const proto = host.includes('localhost') ? 'http' : 'https'
+  const baseUrl = `${proto}://${host}`
 
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('company_id', myProfile.company_id)
-    .order('created_at', { ascending: true })
+  const [{ data: profiles }, { data: invitations }] = await Promise.all([
+    supabase.from('profiles').select('*')
+      .eq('company_id', myProfile.company_id).order('created_at', { ascending: true }),
+    supabase.from('invitations').select('*')
+      .eq('company_id', myProfile.company_id)
+      .is('used_at', null)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false }),
+  ])
 
   return (
     <div className="p-8">
       <EmployeesClient
         profiles={(profiles as Profile[]) ?? []}
         currentUserId={user.id}
+        invitations={invitations ?? []}
+        baseUrl={baseUrl}
       />
     </div>
   )
