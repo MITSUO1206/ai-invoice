@@ -36,7 +36,17 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json()
-  const role = ['admin', 'manager', 'employee'].includes(body.role) ? body.role : 'employee'
+  const requestedRole = body.role
+
+  // マネージャーはemployeeのみ招待可、adminロール招待はadminのみ
+  const allowedRoles = profile.role === 'admin'
+    ? ['admin', 'manager', 'employee']
+    : ['employee']
+
+  if (!allowedRoles.includes(requestedRole)) {
+    return NextResponse.json({ error: 'そのロールの招待を発行する権限がありません' }, { status: 403 })
+  }
+  const role = requestedRole
 
   const { data, error } = await supabase
     .from('invitations')

@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import EmployeesClient from './EmployeesClient'
 import type { Profile } from '@/lib/types'
@@ -14,10 +13,7 @@ export default async function EmployeesPage() {
     .from('profiles').select('company_id, role').eq('id', user.id).single()
   if (!myProfile || myProfile.role !== 'admin') redirect('/dashboard')
 
-  const headersList = await headers()
-  const host = headersList.get('host') ?? ''
-  const proto = host.includes('localhost') ? 'http' : 'https'
-  const baseUrl = `${proto}://${host}`
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ai-invoice-ashen.vercel.app'
 
   const [{ data: profiles }, { data: invitations }] = await Promise.all([
     supabase.from('profiles').select('*')
