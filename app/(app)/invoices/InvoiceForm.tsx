@@ -10,6 +10,7 @@ type Props = {
   defaultTaxRate?: number
   defaultDueDays?: number
   defaultNotes?: string
+  initialTemplateId?: string
 }
 
 const STATUS_OPTIONS: { value: InvoiceStatus; label: string }[] = [
@@ -43,9 +44,12 @@ export default function InvoiceForm({
   defaultTaxRate = 0.1,
   defaultDueDays = 30,
   defaultNotes = '',
+  initialTemplateId,
 }: Props) {
   const router = useRouter()
   const isEdit = !!invoice
+
+  const initialTemplate = initialTemplateId ? templates.find((t) => t.id === initialTemplateId) : undefined
 
   const [clientName, setClientName] = useState(invoice?.client_name ?? '')
   const [clientEmail, setClientEmail] = useState(invoice?.client_email ?? '')
@@ -56,12 +60,16 @@ export default function InvoiceForm({
   const [dueDate, setDueDate] = useState(
     invoice?.due_date ?? addDays(defaultDueDays)
   )
-  const [taxRate, setTaxRate] = useState(String(invoice?.tax_rate ?? defaultTaxRate))
+  const [taxRate, setTaxRate] = useState(String(invoice?.tax_rate ?? initialTemplate?.tax_rate ?? defaultTaxRate))
   const [status, setStatus] = useState<InvoiceStatus>(invoice?.status ?? 'draft')
   const [items, setItems] = useState<InvoiceItem[]>(
-    invoice?.items?.length ? invoice.items : [emptyItem()]
+    invoice?.items?.length
+      ? invoice.items
+      : initialTemplate?.items?.length
+        ? initialTemplate.items
+        : [emptyItem()]
   )
-  const [notes, setNotes] = useState(invoice?.notes ?? defaultNotes ?? '')
+  const [notes, setNotes] = useState(invoice?.notes ?? initialTemplate?.notes ?? defaultNotes ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [aiLoading, setAiLoading] = useState(false)

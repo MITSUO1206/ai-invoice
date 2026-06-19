@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { InvoiceItem, InvoiceTemplate, ExcelTemplate } from '@/lib/types'
 import ExcelTemplateSection from '@/components/ExcelTemplateSection'
 
@@ -321,6 +322,14 @@ export default function TemplatesClient({ templates: initial, excelTemplates }: 
                   <li className="text-xs text-gray-400">他{tmpl.items.length - 3}品目...</li>
                 )}
               </ul>
+              <div className="mt-4 pt-3 border-t border-gray-100">
+                <Link
+                  href={`/invoices/new?template=${tmpl.id}`}
+                  className="block w-full text-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  📄 このテンプレートで請求書作成
+                </Link>
+              </div>
             </div>
           ))}
         </div>
