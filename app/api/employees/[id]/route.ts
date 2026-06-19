@@ -22,6 +22,23 @@ export async function PUT(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // 対象プロフィールの会社が管理下にあるか確認
+  const { data: targetProfile } = await supabase
+    .from('profiles')
+    .select('company_id')
+    .eq('id', id)
+    .single()
+
+  if (!targetProfile) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const { data: targetCompany } = await supabase
+    .from('companies')
+    .select('id')
+    .eq('id', targetProfile.company_id)
+    .single()
+
+  if (!targetCompany) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const body = await request.json()
 
   const VALID_ROLES = ['admin', 'manager', 'employee']
