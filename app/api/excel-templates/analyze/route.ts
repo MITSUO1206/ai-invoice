@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'ファイルのダウンロードに失敗しました' }, { status: 500 })
   }
 
-  const buffer = Buffer.from(await fileData.arrayBuffer())
+  const buffer = Buffer.from(await fileData.arrayBuffer()) as Buffer
 
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.load(buffer)
