@@ -75,3 +75,35 @@ export type DashboardStats = {
   overdue_count: number
   recent_invoices: Invoice[]
 }
+
+export type ExcelFieldMapping = {
+  invoice_number?: { sheet: string; cell: string }
+  issue_date?: { sheet: string; cell: string }
+  due_date?: { sheet: string; cell: string }
+  client_name?: { sheet: string; cell: string }
+  client_address?: { sheet: string; cell: string }
+  issuer_name?: { sheet: string; cell: string }
+  issuer_address?: { sheet: string; cell: string }
+  items_start_row?: number
+  items_sheet?: string
+  item_columns?: {
+    name?: string
+    quantity?: string
+    unit_price?: string
+    amount?: string
+  }
+  subtotal?: { sheet: string; cell: string }
+  tax_amount?: { sheet: string; cell: string }
+  total?: { sheet: string; cell: string }
+  notes?: { sheet: string; cell: string }
+}
+
+export type ExcelTemplate = {
+  id: string
+  company_id: string
+  name: string
+  file_path: string
+  field_mapping: ExcelFieldMapping
+  created_by: string | null
+  created_at: string
+}

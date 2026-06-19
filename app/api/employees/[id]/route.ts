@@ -14,7 +14,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
   const { data: myProfile } = await supabase
     .from('profiles')
-    .select('company_id, role')
+    .select('role')
     .eq('id', user.id)
     .single()
 
@@ -34,12 +34,10 @@ export async function PUT(request: NextRequest, { params }: Params) {
   }
   if (body.is_active !== undefined) updateData.is_active = Boolean(body.is_active)
 
-  // company_id を条件に加えて他社プロフィールの変更を防ぐ
   const { data, error } = await supabase
     .from('profiles')
     .update(updateData)
     .eq('id', id)
-    .eq('company_id', myProfile.company_id)
     .select()
     .single()
 
