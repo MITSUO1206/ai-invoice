@@ -23,8 +23,12 @@ export async function POST(request: NextRequest, { params }: Params) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { data: profile } = await supabase
+    .from('profiles').select('company_id').eq('id', user.id).single()
+  if (!profile) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const { data: template, error: tplError } = await supabase
-    .from('excel_templates').select('*').eq('id', id).single()
+    .from('excel_templates').select('*').eq('id', id).eq('company_id', profile.company_id).single()
   if (tplError || !template) {
     return NextResponse.json({ error: 'テンプレートが見つかりません' }, { status: 404 })
   }

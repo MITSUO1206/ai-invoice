@@ -17,9 +17,10 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   }
 
   const { data: template } = await supabase
-    .from('excel_templates').select('file_path').eq('id', id).single()
+    .from('excel_templates').select('file_path').eq('id', id).eq('company_id', profile.company_id).single()
+  if (!template) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const { error } = await supabase.from('excel_templates').delete().eq('id', id)
+  const { error } = await supabase.from('excel_templates').delete().eq('id', id).eq('company_id', profile.company_id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   if (template?.file_path) {
