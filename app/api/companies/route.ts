@@ -6,12 +6,15 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // 自分が所属する会社 + 自分が作成した会社を取得
-  const { data, error } = await supabase
-    .from('companies')
-    .select('id, name, created_at, created_by')
-    .order('created_at', { ascending: false })
+  const { data: profile } = await supabase
+    .from('profiles').select('company_id, role').eq('id', user.id).single()
+  if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
+  let query = supabase.from('companies').select('id, name, created_at, created_by')
+  if (profile.role !== 'admin') {
+    query = query.eq('id', profile.company_id)
+  }
+  const { data, error } = await query.order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data)
 }
