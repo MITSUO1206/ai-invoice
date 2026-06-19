@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import EmployeesClient from './EmployeesClient'
-import type { Profile } from '@/lib/types'
+import type { Profile, Company } from '@/lib/types'
 
 export default async function EmployeesPage() {
   const supabase = await createClient()
@@ -16,13 +16,12 @@ export default async function EmployeesPage() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ai-invoice-ashen.vercel.app'
 
   const [{ data: profiles }, { data: invitations }, { data: companies }] = await Promise.all([
-    supabase.from('profiles').select('*')
-      .eq('company_id', myProfile.company_id).order('created_at', { ascending: true }),
+    supabase.from('profiles').select('*').order('created_at', { ascending: true }),
     supabase.from('invitations').select('*')
       .is('used_at', null)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false }),
-    supabase.from('companies').select('id, name').order('created_at', { ascending: false }),
+    supabase.from('companies').select('*').order('created_at', { ascending: false }),
   ])
 
   return (
@@ -32,7 +31,7 @@ export default async function EmployeesPage() {
         currentUserId={user.id}
         invitations={invitations ?? []}
         baseUrl={baseUrl}
-        companies={companies ?? []}
+        companies={(companies as Company[]) ?? []}
         myCompanyId={myProfile.company_id}
       />
     </div>
