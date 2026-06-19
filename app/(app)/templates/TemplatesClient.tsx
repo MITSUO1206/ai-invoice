@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { InvoiceItem, InvoiceTemplate } from '@/lib/types'
+import type { InvoiceItem, InvoiceTemplate, ExcelTemplate } from '@/lib/types'
+import ExcelTemplateSection from '@/components/ExcelTemplateSection'
 
 const emptyItem = (): InvoiceItem => ({ name: '', quantity: 1, unit_price: 0, amount: 0 })
 
@@ -24,9 +25,9 @@ function calcAmount(qty: number, price: number) {
   return Math.round(qty * price)
 }
 
-type Props = { templates: InvoiceTemplate[] }
+type Props = { templates: InvoiceTemplate[]; excelTemplates: ExcelTemplate[] }
 
-export default function TemplatesClient({ templates: initial }: Props) {
+export default function TemplatesClient({ templates: initial, excelTemplates }: Props) {
   const router = useRouter()
   const [templates, setTemplates] = useState(initial)
   const [showForm, setShowForm] = useState(false)
@@ -324,6 +325,11 @@ export default function TemplatesClient({ templates: initial }: Props) {
           ))}
         </div>
       )}
+
+      {/* Excel テンプレートセクション */}
+      <div className="mt-10 border-t border-gray-200 pt-8">
+        <ExcelTemplateSection templates={excelTemplates} />
+      </div>
     </div>
   )
 }
