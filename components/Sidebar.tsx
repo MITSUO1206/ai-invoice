@@ -17,8 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: '請求書一覧', href: '/invoices', icon: '📄' },
   { label: '新規作成', href: '/invoices/new', icon: '➕' },
   { label: 'テンプレート', href: '/templates', icon: '📋' },
-  { label: '従業員管理', href: '/employees', icon: '👥', adminOnly: true },
-  { label: '会社管理', href: '/companies', icon: '🏢', adminOnly: true },
+  { label: 'メンバー・会社管理', href: '/employees', icon: '👥', adminOnly: true },
   { label: '自社情報設定', href: '/settings', icon: '⚙️', adminOnly: true },
 ]
 
