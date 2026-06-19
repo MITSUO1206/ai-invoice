@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import Link from 'next/link'
 import type { ExcelTemplate, ExcelFieldMapping } from '@/lib/types'
 
 type Props = {
@@ -272,12 +273,20 @@ export default function ExcelTemplateSection({ templates: initial }: Props) {
                     {new Date(t.created_at).toLocaleDateString('ja-JP')}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => deleteTemplate(t.id)}
-                      className="text-xs text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      削除
-                    </button>
+                    <div className="flex items-center justify-end gap-3">
+                      <Link
+                        href={`/invoices?excelTemplate=${t.id}`}
+                        className="text-xs text-green-600 border border-green-200 rounded px-2 py-1 hover:bg-green-50 transition-colors"
+                      >
+                        このテンプレートを使う
+                      </Link>
+                      <button
+                        onClick={() => deleteTemplate(t.id)}
+                        className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        削除
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
