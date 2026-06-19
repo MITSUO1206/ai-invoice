@@ -275,10 +275,10 @@ export default function ExcelTemplateSection({ templates: initial }: Props) {
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <Link
-                        href={`/invoices?excelTemplate=${t.id}`}
+                        href={`/invoices/new?excelTemplate=${t.id}`}
                         className="text-xs text-green-600 border border-green-200 rounded px-2 py-1 hover:bg-green-50 transition-colors"
                       >
-                        このテンプレートを使う
+                        このテンプレートで請求書作成
                       </Link>
                       <button
                         onClick={() => deleteTemplate(t.id)}

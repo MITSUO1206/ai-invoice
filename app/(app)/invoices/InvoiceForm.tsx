@@ -11,6 +11,8 @@ type Props = {
   defaultDueDays?: number
   defaultNotes?: string
   initialTemplateId?: string
+  excelTemplateId?: string
+  excelTemplateName?: string
 }
 
 const STATUS_OPTIONS: { value: InvoiceStatus; label: string }[] = [
@@ -45,6 +47,8 @@ export default function InvoiceForm({
   defaultDueDays = 30,
   defaultNotes = '',
   initialTemplateId,
+  excelTemplateId,
+  excelTemplateName,
 }: Props) {
   const router = useRouter()
   const isEdit = !!invoice
@@ -171,6 +175,27 @@ export default function InvoiceForm({
       return
     }
 
+    if (excelTemplateId) {
+      try {
+        const xlsRes = await fetch(`/api/excel-templates/${excelTemplateId}/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        })
+        if (xlsRes.ok) {
+          const blob = await xlsRes.blob()
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `invoice_${data.invoice_number}.xlsx`
+          a.click()
+          URL.revokeObjectURL(url)
+        }
+      } catch {
+        // ダウンロード失敗しても請求書詳細へ遷移
+      }
+    }
+
     router.push(`/invoices/${data.id}`)
     router.refresh()
   }
@@ -201,7 +226,11 @@ export default function InvoiceForm({
             disabled={saving}
             className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
-            {saving ? '保存中...' : isEdit ? '更新する' : '作成する'}
+            {saving
+              ? (excelTemplateId ? 'Excel生成中...' : '保存中...')
+              : isEdit
+                ? '更新する'
+                : excelTemplateId ? '作成してExcelダウンロード' : '作成する'}
           </button>
         </div>
       </div>
@@ -241,6 +270,14 @@ export default function InvoiceForm({
           </div>
         )}
       </div>
+
+      {/* Excelテンプレートバナー */}
+      {excelTemplateId && excelTemplateName && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-5 py-3 text-sm text-green-800">
+          <span className="text-lg">📊</span>
+          <span>保存後に <span className="font-semibold">「{excelTemplateName}」</span> でExcelファイルを自動ダウンロードします</span>
+        </div>
+      )}
 
       {/* テンプレート選択 */}
       {templates.length > 0 && (
