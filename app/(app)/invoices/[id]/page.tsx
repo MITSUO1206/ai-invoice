@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import InvoiceDetailClient from './InvoiceDetailClient'
-import type { Invoice, Company } from '@/lib/types'
+import type { Invoice, Company, ExcelTemplate } from '@/lib/types'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -20,11 +20,14 @@ export default async function InvoiceDetailPage({ params }: Props) {
     .eq('id', user.id)
     .single()
 
-  const [{ data: invoice }, { data: company }] = await Promise.all([
+  const [{ data: invoice }, { data: company }, { data: excelTemplates }] = await Promise.all([
     supabase.from('invoices').select('*').eq('id', id).single(),
     profile
       ? supabase.from('companies').select('*').eq('id', profile.company_id).single()
       : { data: null },
+    profile
+      ? supabase.from('excel_templates').select('*').eq('company_id', profile.company_id).order('created_at', { ascending: false })
+      : { data: [] },
   ])
 
   if (!invoice) notFound()
@@ -45,6 +48,7 @@ export default async function InvoiceDetailPage({ params }: Props) {
         companyEmail={comp?.email}
         companyTaxId={comp?.tax_id}
         bankInfo={bankInfo}
+        excelTemplates={(excelTemplates as ExcelTemplate[]) ?? []}
       />
     </div>
   )

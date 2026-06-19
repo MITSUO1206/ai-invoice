@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Invoice, InvoiceStatus } from '@/lib/types'
+import type { Invoice, InvoiceStatus, ExcelTemplate } from '@/lib/types'
 
 const STATUS_LABEL: Record<InvoiceStatus, string> = {
   draft: '下書き',
@@ -38,6 +38,7 @@ type Props = {
   companyEmail?: string | null
   companyTaxId?: string | null
   bankInfo?: string | null
+  excelTemplates?: ExcelTemplate[]
 }
 
 function fmt(n: number) {
@@ -60,12 +61,42 @@ export default function InvoiceDetailClient({
   companyEmail,
   companyTaxId,
   bankInfo,
+  excelTemplates = [],
 }: Props) {
   const router = useRouter()
   const [invoice, setInvoice] = useState(initial)
   const [updating, setUpdating] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
+  const [showExcelModal, setShowExcelModal] = useState(false)
+  const [excelGenerating, setExcelGenerating] = useState(false)
+
+  async function downloadExcel(templateId: string) {
+    setExcelGenerating(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/excel-templates/${templateId}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(invoice),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'Excel出力に失敗しました')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `invoice_${invoice.invoice_number}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+      setShowExcelModal(false)
+    } finally {
+      setExcelGenerating(false)
+    }
+  }
 
   const nextStatusOptions = NEXT_STATUSES[invoice.status] ?? []
 
@@ -129,6 +160,14 @@ export default function InvoiceDetailClient({
               {opt.label}
             </button>
           ))}
+          {excelTemplates.length > 0 && (
+            <button
+              onClick={() => setShowExcelModal(true)}
+              className="px-3 py-1.5 text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors"
+            >
+              📊 Excelで出力
+            </button>
+          )}
           <button
             onClick={() => window.print()}
             className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -248,6 +287,48 @@ export default function InvoiceDetailClient({
           </div>
         )}
       </div>
+
+      {/* Excel テンプレート選択モーダル */}
+      {showExcelModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="font-semibold text-gray-900">Excelテンプレートを選択</h2>
+              <p className="text-xs text-gray-500 mt-0.5">使用するテンプレートを選んでください</p>
+            </div>
+            <div className="p-4 space-y-2">
+              {excelTemplates.map((tmpl) => (
+                <button
+                  key={tmpl.id}
+                  onClick={() => downloadExcel(tmpl.id)}
+                  disabled={excelGenerating}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 hover:border-green-400 hover:bg-green-50 transition-colors text-left disabled:opacity-50"
+                >
+                  <span className="text-xl">📊</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{tmpl.name}</p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(tmpl.created_at).toLocaleDateString('ja-JP')}
+                    </p>
+                  </div>
+                </button>
+              ))}
+              {excelGenerating && (
+                <p className="text-center text-sm text-gray-500 py-2">生成中...</p>
+              )}
+            </div>
+            <div className="p-4 border-t border-gray-100">
+              <button
+                onClick={() => setShowExcelModal(false)}
+                disabled={excelGenerating}
+                className="w-full px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
