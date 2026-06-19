@@ -20,6 +20,11 @@ export async function POST(request: NextRequest) {
   const { file_path } = await request.json()
   if (!file_path) return NextResponse.json({ error: 'file_path が必要です' }, { status: 400 })
 
+  // パストラバーサル防止 + テナント分離: 自社フォルダのファイルのみ許可
+  if (!file_path.startsWith(`${profile.company_id}/`) || file_path.includes('..')) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const { data: fileData, error: downloadError } = await supabase.storage
     .from('excel-templates')
     .download(file_path)
