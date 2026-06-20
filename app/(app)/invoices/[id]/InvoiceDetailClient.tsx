@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import DOMPurify from 'dompurify'
 import type { Invoice, InvoiceStatus, ExcelTemplate } from '@/lib/types'
 
 const STATUS_LABEL: Record<InvoiceStatus, string> = {
@@ -68,8 +69,34 @@ export default function InvoiceDetailClient({
   const [updating, setUpdating] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
+
+  // Excelプレビュー関連
+  const hasExcel = excelTemplates.length > 0
+  const [previewMode, setPreviewMode] = useState<'html' | 'excel'>(hasExcel ? 'excel' : 'html')
+  const [selectedTemplateId, setSelectedTemplateId] = useState(excelTemplates[0]?.id ?? '')
+  const [excelHtml, setExcelHtml] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+
+  // Excelダウンロード用
   const [showExcelModal, setShowExcelModal] = useState(false)
   const [excelGenerating, setExcelGenerating] = useState(false)
+
+  useEffect(() => {
+    if (previewMode !== 'excel' || !selectedTemplateId) return
+    let cancelled = false
+    setPreviewLoading(true)
+    setExcelHtml(null)
+    fetch(`/api/excel-templates/${selectedTemplateId}/preview`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(invoice),
+    })
+      .then((res) => res.json())
+      .then((data) => { if (!cancelled) setExcelHtml(data.html ?? null) })
+      .catch(() => { if (!cancelled) setExcelHtml(null) })
+      .finally(() => { if (!cancelled) setPreviewLoading(false) })
+    return () => { cancelled = true }
+  }, [previewMode, selectedTemplateId, invoice])
 
   async function downloadExcel(templateId: string) {
     setExcelGenerating(true)
@@ -133,18 +160,13 @@ export default function InvoiceDetailClient({
   return (
     <>
       {/* アクションバー */}
-      <div className="flex items-center justify-between mb-6 print:hidden">
+      <div className="flex items-center justify-between mb-4 print:hidden">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.back()}
-            className="text-sm text-gray-500 hover:text-gray-700"
-          >
+          <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">
             ← 戻る
           </button>
           <span className="text-gray-300">|</span>
-          <span
-            className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_CLASS[invoice.status as InvoiceStatus]}`}
-          >
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_CLASS[invoice.status as InvoiceStatus]}`}>
             {STATUS_LABEL[invoice.status as InvoiceStatus]}
           </span>
         </div>
@@ -160,7 +182,7 @@ export default function InvoiceDetailClient({
               {opt.label}
             </button>
           ))}
-          {excelTemplates.length > 0 && (
+          {hasExcel && (
             <button
               onClick={() => setShowExcelModal(true)}
               className="px-3 py-1.5 text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors"
@@ -190,105 +212,168 @@ export default function InvoiceDetailClient({
         </div>
       </div>
 
-      {/* 請求書プレビュー */}
-      <div className="bg-white rounded-xl border border-gray-200 p-10 max-w-3xl print:border-0 print:shadow-none print:p-0">
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-1">請求書</h1>
-            <p className="text-sm text-gray-500">{invoice.invoice_number}</p>
+      {/* プレビュー切り替えバー（Excelテンプレートがある場合のみ） */}
+      {hasExcel && (
+        <div className="flex items-center gap-3 mb-4 print:hidden">
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+            <button
+              onClick={() => setPreviewMode('excel')}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                previewMode === 'excel'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              📊 Excelテンプレート表示
+            </button>
+            <button
+              onClick={() => setPreviewMode('html')}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${
+                previewMode === 'html'
+                  ? 'bg-gray-700 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              🗒 通常表示
+            </button>
           </div>
-          <div className="text-right text-sm text-gray-700 space-y-0.5">
-            <p className="font-bold text-gray-900 text-base">{companyName}</p>
-            {companyAddress && <p>{companyAddress}</p>}
-            {companyPhone && <p>TEL {companyPhone}</p>}
-            {companyEmail && <p>{companyEmail}</p>}
-            {companyTaxId && <p className="text-xs text-gray-500">登録番号 {companyTaxId}</p>}
-          </div>
+          {previewMode === 'excel' && excelTemplates.length > 1 && (
+            <select
+              value={selectedTemplateId}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              {excelTemplates.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          )}
+          {previewMode === 'excel' && previewLoading && (
+            <span className="text-xs text-gray-400">テンプレートを読み込み中...</span>
+          )}
         </div>
+      )}
 
-        <div className="flex justify-between items-end mb-8">
-          <div>
-            <p className="text-sm text-gray-500 mb-1">請求先</p>
-            <p className="text-xl font-bold text-gray-900">{invoice.client_name} 御中</p>
-            {invoice.client_address && (
-              <p className="text-sm text-gray-600 mt-1">{invoice.client_address}</p>
-            )}
-          </div>
-          <div className="text-right text-sm text-gray-600 space-y-1">
-            <div className="flex items-center justify-end gap-3">
-              <span className="text-gray-500">発行日</span>
-              <span className="font-medium">{fmtDate(invoice.issue_date)}</span>
+      {/* Excelテンプレートプレビュー */}
+      {previewMode === 'excel' && hasExcel && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-auto max-h-[80vh] print:border-0 print:max-h-none">
+          {previewLoading && (
+            <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
+              テンプレートを読み込み中...
             </div>
-            {invoice.due_date && (
+          )}
+          {!previewLoading && excelHtml && (
+            <div
+              className="p-4"
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(excelHtml, {
+                  ALLOWED_TAGS: ['table', 'colgroup', 'col', 'tbody', 'tr', 'td'],
+                  ALLOWED_ATTR: ['style', 'rowspan', 'colspan'],
+                }),
+              }}
+            />
+          )}
+          {!previewLoading && !excelHtml && (
+            <div className="flex items-center justify-center py-20 text-gray-400 text-sm">
+              プレビューを読み込めませんでした
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 通常HTMLプレビュー */}
+      {previewMode === 'html' && (
+        <div className="bg-white rounded-xl border border-gray-200 p-10 max-w-3xl print:border-0 print:shadow-none print:p-0">
+          <div className="flex justify-between items-start mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-1">請求書</h1>
+              <p className="text-sm text-gray-500">{invoice.invoice_number}</p>
+            </div>
+            <div className="text-right text-sm text-gray-700 space-y-0.5">
+              <p className="font-bold text-gray-900 text-base">{companyName}</p>
+              {companyAddress && <p>{companyAddress}</p>}
+              {companyPhone && <p>TEL {companyPhone}</p>}
+              {companyEmail && <p>{companyEmail}</p>}
+              {companyTaxId && <p className="text-xs text-gray-500">登録番号 {companyTaxId}</p>}
+            </div>
+          </div>
+
+          <div className="flex justify-between items-end mb-8">
+            <div>
+              <p className="text-sm text-gray-500 mb-1">請求先</p>
+              <p className="text-xl font-bold text-gray-900">{invoice.client_name} 御中</p>
+              {invoice.client_address && (
+                <p className="text-sm text-gray-600 mt-1">{invoice.client_address}</p>
+              )}
+            </div>
+            <div className="text-right text-sm text-gray-600 space-y-1">
               <div className="flex items-center justify-end gap-3">
-                <span className="text-gray-500">支払期限</span>
-                <span className="font-medium">{fmtDate(invoice.due_date)}</span>
+                <span className="text-gray-500">発行日</span>
+                <span className="font-medium">{fmtDate(invoice.issue_date)}</span>
               </div>
-            )}
+              {invoice.due_date && (
+                <div className="flex items-center justify-end gap-3">
+                  <span className="text-gray-500">支払期限</span>
+                  <span className="font-medium">{fmtDate(invoice.due_date)}</span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* 合計金額 */}
-        <div className="bg-gray-50 rounded-lg p-5 mb-8 flex justify-between items-center">
-          <span className="text-gray-600">ご請求金額（税込）</span>
-          <span className="text-3xl font-bold text-gray-900">{fmt(Number(invoice.total))}</span>
-        </div>
+          <div className="bg-gray-50 rounded-lg p-5 mb-8 flex justify-between items-center">
+            <span className="text-gray-600">ご請求金額（税込）</span>
+            <span className="text-3xl font-bold text-gray-900">{fmt(Number(invoice.total))}</span>
+          </div>
 
-        {/* 明細テーブル */}
-        <table className="w-full text-sm mb-8">
-          <thead>
-            <tr className="border-b-2 border-gray-900 text-xs text-gray-500">
-              <th className="text-left py-2 pr-4 font-medium">品目・説明</th>
-              <th className="text-right py-2 pr-4 font-medium w-20">数量</th>
-              <th className="text-right py-2 pr-4 font-medium w-28">単価</th>
-              <th className="text-right py-2 font-medium w-28">金額</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoice.items.map((item, i) => (
-              <tr key={i} className="border-b border-gray-100">
-                <td className="py-3 pr-4 text-gray-800">{item.name}</td>
-                <td className="py-3 pr-4 text-right text-gray-600">{item.quantity}</td>
-                <td className="py-3 pr-4 text-right text-gray-600">
-                  {fmt(item.unit_price)}
-                </td>
-                <td className="py-3 text-right font-medium text-gray-900">
-                  {fmt(item.amount)}
-                </td>
+          <table className="w-full text-sm mb-8">
+            <thead>
+              <tr className="border-b-2 border-gray-900 text-xs text-gray-500">
+                <th className="text-left py-2 pr-4 font-medium">品目・説明</th>
+                <th className="text-right py-2 pr-4 font-medium w-20">数量</th>
+                <th className="text-right py-2 pr-4 font-medium w-28">単価</th>
+                <th className="text-right py-2 font-medium w-28">金額</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {invoice.items.map((item, i) => (
+                <tr key={i} className="border-b border-gray-100">
+                  <td className="py-3 pr-4 text-gray-800">{item.name}</td>
+                  <td className="py-3 pr-4 text-right text-gray-600">{item.quantity}</td>
+                  <td className="py-3 pr-4 text-right text-gray-600">{fmt(item.unit_price)}</td>
+                  <td className="py-3 text-right font-medium text-gray-900">{fmt(item.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-        {/* 小計・税・合計 */}
-        <div className="flex justify-end mb-8">
-          <div className="w-64 space-y-2 text-sm">
-            <div className="flex justify-between text-gray-600">
-              <span>小計</span>
-              <span>{fmt(Number(invoice.subtotal))}</span>
-            </div>
-            <div className="flex justify-between text-gray-600">
-              <span>消費税（{Math.round(Number(invoice.tax_rate) * 100)}%）</span>
-              <span>{fmt(Number(invoice.tax_amount))}</span>
-            </div>
-            <div className="flex justify-between font-bold text-gray-900 text-base border-t border-gray-200 pt-2">
-              <span>合計</span>
-              <span>{fmt(Number(invoice.total))}</span>
+          <div className="flex justify-end mb-8">
+            <div className="w-64 space-y-2 text-sm">
+              <div className="flex justify-between text-gray-600">
+                <span>小計</span>
+                <span>{fmt(Number(invoice.subtotal))}</span>
+              </div>
+              <div className="flex justify-between text-gray-600">
+                <span>消費税（{Math.round(Number(invoice.tax_rate) * 100)}%）</span>
+                <span>{fmt(Number(invoice.tax_amount))}</span>
+              </div>
+              <div className="flex justify-between font-bold text-gray-900 text-base border-t border-gray-200 pt-2">
+                <span>合計</span>
+                <span>{fmt(Number(invoice.total))}</span>
+              </div>
             </div>
           </div>
+
+          {(invoice.notes || bankInfo) && (
+            <div className="border-t border-gray-200 pt-6">
+              <p className="text-xs font-medium text-gray-500 mb-2">備考</p>
+              {bankInfo && <p className="text-sm text-gray-700 mb-1">{bankInfo}</p>}
+              {invoice.notes && <p className="text-sm text-gray-700 whitespace-pre-wrap">{invoice.notes}</p>}
+            </div>
+          )}
         </div>
+      )}
 
-        {/* 備考 */}
-        {(invoice.notes || bankInfo) && (
-          <div className="border-t border-gray-200 pt-6">
-            <p className="text-xs font-medium text-gray-500 mb-2">備考</p>
-            {bankInfo && <p className="text-sm text-gray-700 mb-1">{bankInfo}</p>}
-            {invoice.notes && <p className="text-sm text-gray-700 whitespace-pre-wrap">{invoice.notes}</p>}
-          </div>
-        )}
-      </div>
-
-      {/* Excel テンプレート選択モーダル */}
+      {/* Excel ダウンロード選択モーダル */}
       {showExcelModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
@@ -307,9 +392,7 @@ export default function InvoiceDetailClient({
                   <span className="text-xl">📊</span>
                   <div>
                     <p className="text-sm font-medium text-gray-900">{tmpl.name}</p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(tmpl.created_at).toLocaleDateString('ja-JP')}
-                    </p>
+                    <p className="text-xs text-gray-400">{new Date(tmpl.created_at).toLocaleDateString('ja-JP')}</p>
                   </div>
                 </button>
               ))}
