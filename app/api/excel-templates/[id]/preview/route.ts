@@ -49,13 +49,17 @@ function worksheetToHtml(worksheet: ExcelJS.Worksheet): string {
       if (!start || !end) continue
       const startCell = worksheet.getCell(start)
       const endCell = worksheet.getCell(end)
-      const rowspan = endCell.row - startCell.row + 1
-      const colspan = endCell.col - startCell.col + 1
+      const startRow = Number(startCell.row)
+      const startCol = Number(startCell.col)
+      const endRow = Number(endCell.row)
+      const endCol = Number(endCell.col)
+      const rowspan = endRow - startRow + 1
+      const colspan = endCol - startCol + 1
       mergeMap.set(start, { rowspan, colspan })
       // スキップするセルを登録
-      for (let r = startCell.row; r <= endCell.row; r++) {
-        for (let c = startCell.col; c <= endCell.col; c++) {
-          if (r === startCell.row && c === startCell.col) continue
+      for (let r = startRow; r <= endRow; r++) {
+        for (let c = startCol; c <= endCol; c++) {
+          if (r === startRow && c === startCol) continue
           skipSet.add(worksheet.getCell(r, c).address)
         }
       }
